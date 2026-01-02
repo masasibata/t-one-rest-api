@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "t-one-rest-api"
+version = "1.0.0"
+description = "REST API for Russian speech recognition using T-one model"
+authors = ["Masa"]
+readme = "README.md"
+license = "MIT"
+packages = [{include = "asr_api"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = ">=0.104.0"
+uvicorn = {extras = ["standard"], version = ">=0.24.0"}
+python-multipart = ">=0.0.6"
+pydantic = ">=2.0.0"
+miniaudio = ">=1.50,<2.0"
+tone = {path = "T-one", develop = true}
+
+[tool.poetry.group.dev.dependencies]
+# Development dependencies can be added here if needed
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
