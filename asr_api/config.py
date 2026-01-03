@@ -1,6 +1,6 @@
 """Configuration management for ASR API"""
 
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings
 from pydantic import Field, field_validator
 from asr_api.storage import StorageType
@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     redis_key_prefix: str = Field(
         default="asr:session:",
         description="Redis key prefix for session states"
+    )
+    
+    # API Security Configuration
+    api_key: Optional[str] = Field(
+        default=None,
+        description="Optional API key for authentication. If set, all endpoints (except /health and /) require X-API-Key header"
     )
     
     @field_validator("storage_type", mode="before")

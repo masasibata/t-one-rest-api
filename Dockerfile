@@ -29,6 +29,11 @@ RUN if [ ! -d "T-one" ]; then \
 # Install dependencies (without Redis by default)
 RUN poetry install --no-interaction --no-root
 
+# Download model during build (faster startup)
+RUN echo "Downloading T-one model (this may take a few minutes)..." && \
+    poetry run python -m tone download /models && \
+    echo "Model downloaded successfully!"
+
 # Copy application code
 COPY asr_api/ ./asr_api/
 COPY LICENSE ./
@@ -36,10 +41,14 @@ COPY LICENSE ./
 # Expose port
 EXPOSE 8000
 
+# Set environment variable to load model from local folder
+ENV LOAD_FROM_FOLDER=/models
+
 # Health check (using curl which is installed)
+# Reduced start_period since model is pre-downloaded
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application
-CMD ["poetry", "run", "uvicorn", "asr_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application with unbuffered output
+CMD ["poetry", "run", "python", "-u", "-m", "uvicorn", "asr_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 

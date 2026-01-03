@@ -30,13 +30,56 @@ class AudioProcessor:
         self.load_model()
     
     def load_model(self):
-        """Load T-one model from HuggingFace"""
+        """Load T-one model from local folder or HuggingFace"""
         if self.pipeline is not None:
+            logger.debug("Model already loaded, skipping")
             return
         
+        # Check if model should be loaded from local folder
+        model_folder = os.environ.get("LOAD_FROM_FOLDER")
+        
+        if model_folder and os.path.exists(model_folder):
+            logger.info(f"Loading T-one model from local folder: {model_folder}")
+            try:
+                import sys
+                sys.stdout.flush()
+                
+                logger.info("Initializing StreamingCTCPipeline from local folder...")
+                sys.stdout.flush()
+                
+                # Use from_local() for local folder, not from_hugging_face()
+                self.pipeline = StreamingCTCPipeline.from_local(model_folder)
+                
+                logger.info("Model loaded successfully from local folder!")
+                logger.info("API is ready to process requests")
+                sys.stdout.flush()
+                return
+            except Exception as e:
+                logger.warning(f"Failed to load from local folder ({model_folder}): {str(e)}")
+                logger.warning("Falling back to HuggingFace download...")
+        
+        # Fallback to HuggingFace
         logger.info("Loading T-one model from HuggingFace...")
-        self.pipeline = StreamingCTCPipeline.from_hugging_face()
-        logger.info("Model loaded successfully from HuggingFace")
+        logger.info("This may take a few minutes on first run (downloading model)")
+        
+        try:
+            import sys
+            sys.stdout.flush()
+            
+            logger.info("Initializing StreamingCTCPipeline...")
+            sys.stdout.flush()
+            
+            self.pipeline = StreamingCTCPipeline.from_hugging_face()
+            
+            logger.info("Model loaded successfully from HuggingFace!")
+            logger.info("API is ready to process requests")
+            sys.stdout.flush()
+            
+        except Exception as e:
+            logger.error(f"Failed to load model: {str(e)}")
+            import sys
+            sys.stdout.flush()
+            raise
     
     def process_audio_file(self, audio_bytes: bytes, filename: str) -> np.ndarray:
         """

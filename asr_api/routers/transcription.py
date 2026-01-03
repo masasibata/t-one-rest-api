@@ -8,6 +8,7 @@ from asr_api.services.audio_service import AudioService
 from asr_api.utils.converters import phrases_to_text_phrases, calculate_duration, extract_full_text
 from asr_api.utils.validators import validate_audio_file
 from asr_api.utils.exceptions import ASRException, ModelNotLoadedError
+from asr_api.utils.auth import verify_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,8 @@ def get_audio_service() -> AudioService:
 async def transcribe_audio(
     file: UploadFile = File(..., description="Audio file for recognition"),
     return_timestamps: bool = Form(True, description="Return timestamps"),
-    audio_service: AudioService = Depends(get_audio_service)
+    audio_service: AudioService = Depends(get_audio_service),
+    _: bool = Depends(verify_api_key)
 ):
     """
     Transcribe speech from audio file (offline mode)

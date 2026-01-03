@@ -10,6 +10,7 @@ from asr_api.config import settings
 from asr_api.utils.converters import phrases_to_text_phrases
 from asr_api.utils.validators import validate_audio_file
 from asr_api.utils.exceptions import ASRException, StateNotFoundError, ModelNotLoadedError
+from asr_api.utils.auth import verify_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,8 @@ def get_streaming_service() -> StreamingService:
 
 @router.post("", response_model=StreamingStateResponse)
 async def start_streaming(
-    streaming_service: StreamingService = Depends(get_streaming_service)
+    streaming_service: StreamingService = Depends(get_streaming_service),
+    _: bool = Depends(verify_api_key)
 ):
     """
     Start streaming recognition session
@@ -62,7 +64,8 @@ async def start_streaming(
 async def process_streaming_chunk(
     state_id: str = Form(..., description="State ID from start_streaming"),
     file: UploadFile = File(..., description="Audio chunk for processing"),
-    streaming_service: StreamingService = Depends(get_streaming_service)
+    streaming_service: StreamingService = Depends(get_streaming_service),
+    _: bool = Depends(verify_api_key)
 ):
     """
     Process audio chunk in streaming mode
@@ -105,7 +108,8 @@ async def process_streaming_chunk(
 @router.post("/finalize", response_model=StreamingStateResponse)
 async def finalize_streaming(
     state_id: str = Form(..., description="State ID for finalization"),
-    streaming_service: StreamingService = Depends(get_streaming_service)
+    streaming_service: StreamingService = Depends(get_streaming_service),
+    _: bool = Depends(verify_api_key)
 ):
     """
     Finalize streaming session and get final results

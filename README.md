@@ -145,8 +145,55 @@ make run
 
 Once the server is running, you can explore the API using:
 
-- **Swagger UI** (`/docs`) - Interactive API explorer with "Try it out" feature
-- **ReDoc** (`/redoc`) - Beautiful, responsive API documentation
+- **Swagger UI** (`/docs`) - Interactive API explorer with "Try it out" feature (protected with `X-API-Key` header if `API_KEY` is set)
+- **ReDoc** (`/redoc`) - Beautiful, responsive API documentation (protected with `X-API-Key` header if `API_KEY` is set)
+
+### API Authentication (Optional)
+
+The API supports optional API key authentication. If `API_KEY` environment variable is set, all endpoints except `/health` and `/` require the key to be provided in the `X-API-Key` header.
+
+**Configuration:**
+
+```bash
+# Set API key via environment variable
+export API_KEY=your-secret-key-here
+
+# Or in .env file
+echo "API_KEY=your-secret-key-here" >> .env
+```
+
+**Usage:**
+
+When API key is configured, include it in the `X-API-Key` header:
+
+```bash
+# Without API key (if not configured)
+curl -X POST "http://localhost:8000/transcribe" -F "file=@audio.wav"
+
+# With API key (if configured)
+curl -X POST "http://localhost:8000/transcribe" \
+     -H "X-API-Key: your-secret-key-here" \
+     -F "file=@audio.wav"
+```
+
+**Protected Endpoints:**
+
+- `POST /transcribe` - Requires API key if configured
+- `POST /transcribe/streaming` - Requires API key if configured
+- `POST /transcribe/streaming/chunk` - Requires API key if configured
+- `POST /transcribe/streaming/finalize` - Requires API key if configured
+
+**Public Endpoints (always accessible):**
+
+- `GET /` - API information
+- `GET /health` - Health check
+
+**Protected Documentation (if `API_KEY` is set):**
+
+- `GET /docs` - Swagger UI (requires `X-API-Key` header)
+- `GET /redoc` - ReDoc documentation (requires `X-API-Key` header)
+
+> 💡 **Note:** If `API_KEY` is not set, the API works without authentication. This is useful for development or internal networks.
 
 ### Endpoints Overview
 
@@ -239,6 +286,21 @@ curl -X POST "http://localhost:8000/transcribe" \
 
 Create a new streaming recognition session.
 
+**Headers:**
+
+- `X-API-Key` (string, optional) - API key for authentication (required if `API_KEY` env var is set)
+
+**Example Request:**
+
+```bash
+# Without API key (if not configured)
+curl -X POST "http://localhost:8000/transcribe/streaming"
+
+# With API key (if configured)
+curl -X POST "http://localhost:8000/transcribe/streaming" \
+     -H "X-API-Key: your-secret-key"
+```
+
 **Response:**
 
 ```json
@@ -258,10 +320,21 @@ Process an audio chunk in streaming mode.
 - `state_id` (string, required) - State ID from `/transcribe/streaming`
 - `file` (file, required) - Audio chunk
 
+**Headers:**
+
+- `X-API-Key` (string, optional) - API key for authentication (required if `API_KEY` env var is set)
+
 **Example Request:**
 
 ```bash
+# Without API key (if not configured)
 curl -X POST "http://localhost:8000/transcribe/streaming/chunk" \
+     -F "state_id=550e8400-e29b-41d4-a716-446655440000" \
+     -F "file=@chunk.wav"
+
+# With API key (if configured)
+curl -X POST "http://localhost:8000/transcribe/streaming/chunk" \
+     -H "X-API-Key: your-secret-key" \
      -F "state_id=550e8400-e29b-41d4-a716-446655440000" \
      -F "file=@chunk.wav"
 ```
@@ -274,10 +347,20 @@ Finalize streaming session and get final results.
 
 - `state_id` (string, required) - State ID from streaming session
 
+**Headers:**
+
+- `X-API-Key` (string, optional) - API key for authentication (required if `API_KEY` env var is set)
+
 **Example Request:**
 
 ```bash
+# Without API key (if not configured)
 curl -X POST "http://localhost:8000/transcribe/streaming/finalize" \
+     -F "state_id=550e8400-e29b-41d4-a716-446655440000"
+
+# With API key (if configured)
+curl -X POST "http://localhost:8000/transcribe/streaming/finalize" \
+     -H "X-API-Key: your-secret-key" \
      -F "state_id=550e8400-e29b-41d4-a716-446655440000"
 ```
 
@@ -310,9 +393,17 @@ with open("audio.wav", "rb") as f:
 
 ```python
 import requests
+import os
+
+# Optional: Get API key from environment
+api_key = os.getenv("API_KEY")
+headers = {"X-API-Key": api_key} if api_key else {}
 
 # 1. Start streaming session
-response = requests.post("http://localhost:8000/transcribe/streaming")
+response = requests.post(
+    "http://localhost:8000/transcribe/streaming",
+    headers=headers
+)
 state_id = response.json()["state_id"]
 
 # 2. Process audio chunks
@@ -323,7 +414,8 @@ for chunk_file in chunk_files:
         response = requests.post(
             "http://localhost:8000/transcribe/streaming/chunk",
             files={"file": f},
-            data={"state_id": state_id}
+            data={"state_id": state_id},
+            headers=headers
         )
         result = response.json()
 
@@ -334,7 +426,8 @@ for chunk_file in chunk_files:
 # 3. Finalize session
 response = requests.post(
     "http://localhost:8000/transcribe/streaming/finalize",
-    data={"state_id": state_id}
+    data={"state_id": state_id},
+    headers=headers
 )
 final_result = response.json()
 print("\nFinal phrases:")
@@ -440,6 +533,7 @@ docker run -d \
 | `REDIS_KEY_PREFIX`        | `asr:session:`             | Redis key prefix                            |
 | `SESSION_TIMEOUT_SECONDS` | `3600`                     | Session timeout in seconds                  |
 | `MAX_FILE_SIZE_MB`        | `100`                      | Maximum file size in MB                     |
+| `API_KEY`                 | `None` (optional)          | Optional API key for authentication         |
 
 **Volumes:**
 

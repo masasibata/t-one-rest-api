@@ -138,7 +138,7 @@ clean:
 # Docker commands
 docker-build:
 	@echo "Building Docker images..."
-	docker-compose build
+	docker compose build
 
 docker-up:
 	@echo "Starting services with docker-compose..."
