@@ -25,7 +25,49 @@ A complete, ready-to-use REST API that provides Russian speech recognition capab
 
 ## 🚀 Quick Start
 
-### Prerequisites
+Choose your preferred deployment method:
+
+### 🐳 Option 1: Docker (Recommended - Fastest)
+
+The easiest way to get started is using Docker Compose. No need to install dependencies manually!
+
+**With Memory Storage:**
+
+```bash
+# Clone repository
+git clone https://github.com/masasibata/t-one-rest-api.git
+cd t-one-rest-api
+
+# Start API (builds automatically on first run)
+docker compose up -d api
+
+# View logs
+docker compose logs -f api
+```
+
+**With Redis Storage (for production):**
+
+```bash
+# Start API with Redis
+docker compose up -d api-redis redis
+
+# View logs
+docker compose logs -f api-redis
+```
+
+**Access the API:**
+
+- 🌐 API: `http://localhost:8000` (memory) or `http://localhost:8001` (Redis)
+- 📖 Swagger UI: `http://localhost:8000/docs`
+- 📘 ReDoc: `http://localhost:8000/redoc`
+
+> 💡 **Tip:** Docker automatically handles all dependencies, model downloads, and configuration. Perfect for quick testing and production deployment!
+
+### 🔧 Option 2: Local Installation
+
+For development or if you prefer local installation:
+
+**Prerequisites:**
 
 | Requirement | Version | Installation                          |
 | ----------- | ------- | ------------------------------------- |
@@ -49,16 +91,16 @@ xcode-select --install
 # Download from https://cmake.org/download/
 ```
 
-### Installation
+**Installation Steps:**
 
-**1. Clone the repository:**
+1. **Clone the repository:**
 
 ```bash
 git clone https://github.com/masasibata/t-one-rest-api.git
 cd t-one-rest-api
 ```
 
-**2. Install dependencies:**
+2. **Install dependencies:**
 
 ```bash
 make install
@@ -73,25 +115,23 @@ This command will:
 
 > ⏱️ **Note:** Installation may take several minutes when building the `kenlm` package. Be patient!
 
-**3a. (Optional) Install with Redis support:**
+3. **(Optional) Install with Redis support:**
 
-For production deployments with multiple API instances, you can use Redis for distributed session storage:
+For production deployments with multiple API instances:
 
 ```bash
 make install-redis
 ```
 
-This will install the API with Redis support. You'll need a running Redis instance to use this feature.
+> 💡 **Note:** For single-instance deployments, the default memory storage is sufficient.
 
-> 💡 **Note:** For single-instance deployments, the default memory storage is sufficient and doesn't require Redis.
-
-**3. Start the server:**
+4. **Start the server:**
 
 ```bash
 make run
 ```
 
-**4. Access the API:**
+5. **Access the API:**
 
 - 🌐 API: `http://localhost:8000`
 - 📖 Swagger UI: `http://localhost:8000/docs`
@@ -308,72 +348,56 @@ for phrase in final_result["phrases"]:
 
 ## 🛠️ Makefile Commands
 
-| Command           | Description                                      |
-| ----------------- | ------------------------------------------------ |
-| `make install`    | Clone T-one and install dependencies (memory)    |
+| Command              | Description                                        |
+| -------------------- | -------------------------------------------------- |
+| `make install`       | Clone T-one and install dependencies (memory)      |
 | `make install-redis` | Install with Redis support for distributed storage |
-| `make run`        | Start the ASR API server                         |
-| `make clean`      | Remove T-one clone and cache files               |
-| `make help`       | Show available commands                           |
+| `make run`           | Start the ASR API server                           |
+| `make docker-build`  | Build Docker images                                |
+| `make docker-up`     | Start services with docker-compose                 |
+| `make docker-down`   | Stop docker-compose services                       |
+| `make docker-logs`   | View docker-compose logs                           |
+| `make clean`         | Remove T-one clone and cache files                 |
+| `make help`          | Show available commands                            |
 
 ---
 
-## 🔧 Alternative Installation
+## 🐳 Docker Deployment Details
 
-If you prefer to install manually without Makefile:
+### Docker Compose Services
 
-```bash
-# 1. Clone T-one repository
-git clone https://github.com/voicekit-team/T-one.git
+The `docker-compose.yml` includes three services:
 
-# 2. Install with Poetry
-poetry install
+| Service     | Description             | Port | Storage   |
+| ----------- | ----------------------- | ---- | --------- |
+| `api`       | API with memory storage | 8000 | In-memory |
+| `api-redis` | API with Redis storage  | 8001 | Redis     |
+| `redis`     | Redis server            | 6379 | -         |
 
-# 3. Run the server
-poetry run uvicorn asr_api.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
----
-
-## 🐳 Docker Deployment
-
-The easiest way to deploy the API is using Docker. Two options are available:
-
-### Option 1: Docker Compose (Recommended)
-
-**With Memory Storage:**
+### Quick Commands
 
 ```bash
-# Build and start API with memory storage
-docker-compose up -d api
+# Start API with memory storage
+docker compose up -d api
+
+# Start API with Redis
+docker compose up -d api-redis redis
 
 # View logs
-docker-compose logs -f api
+docker compose logs -f api
 
-# Stop
-docker-compose down
+# Stop all services
+docker compose down
+
+# Rebuild images
+docker compose build
 ```
 
-**With Redis Storage:**
+### Manual Docker Build
 
-```bash
-# Build and start API with Redis
-docker-compose up -d api-redis redis
+If you prefer to build and run manually:
 
-# View logs
-docker-compose logs -f api-redis
-
-# Stop
-docker-compose down
-```
-
-This will start:
-- API server on `http://localhost:8000` (or `http://localhost:8001` for Redis version)
-- Redis server on `localhost:6379` (if using Redis storage)
-
-### Option 2: Docker Build
-
-**Build the image:**
+**Build images:**
 
 ```bash
 # Memory storage version
@@ -383,7 +407,7 @@ docker build -t t-one-rest-api .
 docker build -f Dockerfile.redis -t t-one-rest-api:redis .
 ```
 
-**Run the container:**
+**Run containers:**
 
 ```bash
 # Memory storage
@@ -399,40 +423,35 @@ docker run -d \
   -p 8000:8000 \
   -e STORAGE_TYPE=redis \
   -e REDIS_URL=redis://host.docker.internal:6379/0 \
-  --link redis:redis \
   t-one-rest-api:redis
 ```
 
-### Environment Variables
+### Configuration
 
-You can customize the API behavior using environment variables:
+**Environment Variables:**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `HOST` | `0.0.0.0` | Server host |
-| `PORT` | `8000` | Server port |
-| `LOG_LEVEL` | `INFO` | Logging level |
-| `STORAGE_TYPE` | `memory` | Storage type: `memory` or `redis` |
-| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection URL |
-| `SESSION_TIMEOUT_SECONDS` | `3600` | Session timeout |
-| `MAX_FILE_SIZE_MB` | `100` | Maximum file size in MB |
+| Variable                  | Default                    | Description                                 |
+| ------------------------- | -------------------------- | ------------------------------------------- |
+| `HOST`                    | `0.0.0.0`                  | Server host                                 |
+| `PORT`                    | `8000`                     | Server port                                 |
+| `LOG_LEVEL`               | `INFO`                     | Logging level (DEBUG, INFO, WARNING, ERROR) |
+| `STORAGE_TYPE`            | `memory`                   | Storage type: `memory` or `redis`           |
+| `REDIS_URL`               | `redis://localhost:6379/0` | Redis connection URL                        |
+| `REDIS_KEY_PREFIX`        | `asr:session:`             | Redis key prefix                            |
+| `SESSION_TIMEOUT_SECONDS` | `3600`                     | Session timeout in seconds                  |
+| `MAX_FILE_SIZE_MB`        | `100`                      | Maximum file size in MB                     |
 
-### Docker Compose Services
+**Volumes:**
 
-- **`api`** - API with memory storage (port 8000)
-- **`api-redis`** - API with Redis storage (port 8001)
-- **`redis`** - Redis server (port 6379)
+- `model-cache` - Caches downloaded models from HuggingFace (persists between restarts)
+- `redis-data` - Persistent Redis data storage
 
-### Volumes
+**Health Checks:**
 
-- `model-cache` - Caches downloaded models from HuggingFace
-- `redis-data` - Persistent Redis data
+All services include automatic health checks:
 
-### Health Checks
-
-All services include health checks:
-- API: `GET /health`
-- Redis: `redis-cli ping`
+- API: `GET /health` endpoint
+- Redis: `redis-cli ping` command
 
 ---
 
@@ -504,14 +523,14 @@ brew services start redis
 
 ### Storage Comparison
 
-| Feature | Memory Storage | Redis Storage |
-|--------|---------------|---------------|
-| **Setup** | No additional setup | Requires Redis server |
-| **Performance** | Fastest (in-process) | Fast (network overhead) |
-| **Persistence** | Lost on restart | Survives restarts |
-| **Multi-instance** | ❌ Not supported | ✅ Supported |
-| **Scalability** | Single server only | Horizontal scaling |
-| **Production Ready** | Limited | ✅ Recommended |
+| Feature              | Memory Storage       | Redis Storage           |
+| -------------------- | -------------------- | ----------------------- |
+| **Setup**            | No additional setup  | Requires Redis server   |
+| **Performance**      | Fastest (in-process) | Fast (network overhead) |
+| **Persistence**      | Lost on restart      | Survives restarts       |
+| **Multi-instance**   | ❌ Not supported     | ✅ Supported            |
+| **Scalability**      | Single server only   | Horizontal scaling      |
+| **Production Ready** | Limited              | ✅ Recommended          |
 
 ---
 
@@ -637,14 +656,16 @@ poetry run uvicorn asr_api.main:app --host 0.0.0.0 --port 8000 --reload
 ### Recommendations
 
 1. **State Storage** - Use Redis storage for multi-instance deployments:
+
    ```bash
    # Install with Redis
    make install-redis
-   
+
    # Configure
    export STORAGE_TYPE=redis
    export REDIS_URL=redis://your-redis-host:6379/0
    ```
+
 2. **CORS** - Configure specific domains instead of `"*"` in `CORSMiddleware`
 3. **Authentication** - Add JWT tokens or API keys to protect endpoints
 4. **Rate Limiting** - Implement request rate limiting per client
