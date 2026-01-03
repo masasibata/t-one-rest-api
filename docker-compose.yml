@@ -1,0 +1,87 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: t-one-rest-api
+    ports:
+      - "8000:8000"
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      LOG_LEVEL: "INFO"
+      STORAGE_TYPE: "memory"
+      SESSION_TIMEOUT_SECONDS: "3600"
+      MAX_FILE_SIZE_MB: "100"
+    volumes:
+      # Mount code for development (optional)
+      # - ./asr_api:/app/asr_api
+      # Cache model downloads
+      - model-cache:/root/.cache/huggingface
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - asr-network
+
+  api-redis:
+    build:
+      context: .
+      dockerfile: Dockerfile.redis
+    container_name: t-one-rest-api-redis
+    ports:
+      - "8001:8000"
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      LOG_LEVEL: "INFO"
+      STORAGE_TYPE: "redis"
+      REDIS_URL: "redis://redis:6379/0"
+      REDIS_KEY_PREFIX: "asr:session:"
+      SESSION_TIMEOUT_SECONDS: "3600"
+      MAX_FILE_SIZE_MB: "100"
+    depends_on:
+      - redis
+    volumes:
+      - model-cache:/root/.cache/huggingface
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - asr-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: t-one-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - asr-network
+
+volumes:
+  model-cache:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  asr-network:
+    driver: bridge
+

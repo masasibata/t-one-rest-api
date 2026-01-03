@@ -5,7 +5,8 @@ from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
 from asr_api.models import StreamingStateResponse
 from asr_api.services.streaming_service import StreamingService
 from asr_api.services.audio_service import AudioService
-from asr_api.storage import MemoryStorage
+from asr_api.storage import create_storage, StateStorage
+from asr_api.config import settings
 from asr_api.utils.converters import phrases_to_text_phrases
 from asr_api.utils.validators import validate_audio_file
 from asr_api.utils.exceptions import ASRException, StateNotFoundError, ModelNotLoadedError
@@ -14,8 +15,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/transcribe/streaming", tags=["streaming"])
 
-# Global storage instance (in production, use dependency injection)
-_storage = MemoryStorage()
+# Create storage based on configuration
+_storage = create_storage(
+    storage_type=settings.storage_type,
+    timeout_seconds=settings.session_timeout_seconds,
+    redis_url=settings.redis_url,
+    redis_key_prefix=settings.redis_key_prefix
+)
+
+
+def get_storage() -> StateStorage:
+    """Get the global storage instance (for shutdown cleanup)"""
+    return _storage
 
 
 def get_streaming_service() -> StreamingService:
