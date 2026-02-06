@@ -14,6 +14,7 @@ A complete, ready-to-use REST API that provides Russian speech recognition capab
 
 - 🎯 **Offline Recognition** - Transcribe complete audio files with timestamps
 - 🔄 **Streaming Recognition** - Real-time speech recognition with low latency
+- ⚡ **Parallel Processing** - Multiple workers for concurrent request handling
 - 📚 **Auto Documentation** - Interactive Swagger UI and ReDoc
 - 🚀 **Easy Setup** - Automated installation with Makefile
 - 🏭 **Production Ready** - Clean codebase with comprehensive error handling
@@ -62,6 +63,8 @@ docker compose logs -f api-redis
 - 📘 ReDoc: `http://localhost:8000/redoc`
 
 > 💡 **Tip:** Docker automatically handles all dependencies, model downloads, and configuration. Perfect for quick testing and production deployment!
+>
+> ⚡ **Performance:** For better throughput with multiple concurrent requests, see [Performance Tuning](#-performance-tuning) section to configure multiple workers.
 
 ### 🔧 Option 2: Local Installation
 
@@ -136,6 +139,8 @@ make run
 - 🌐 API: `http://localhost:8000`
 - 📖 Swagger UI: `http://localhost:8000/docs`
 - 📘 ReDoc: `http://localhost:8000/redoc`
+
+> ⚡ **Performance:** For production use with multiple concurrent requests, see [Performance Tuning](#-performance-tuning) section to configure multiple workers.
 
 ---
 
@@ -445,7 +450,8 @@ for phrase in final_result["phrases"]:
 | -------------------- | -------------------------------------------------- |
 | `make install`       | Clone T-one and install dependencies (memory)      |
 | `make install-redis` | Install with Redis support for distributed storage |
-| `make run`           | Start the ASR API server                           |
+| `make run`           | Start the ASR API server (development, single worker) |
+| `make run-prod`      | Start the ASR API server (production, multiple workers) |
 | `make docker-build`  | Build Docker images                                |
 | `make docker-up`     | Start services with docker-compose                 |
 | `make docker-down`   | Stop docker-compose services                       |
@@ -527,6 +533,7 @@ docker run -d \
 | ------------------------- | -------------------------- | ------------------------------------------- |
 | `HOST`                    | `0.0.0.0`                  | Server host                                 |
 | `PORT`                    | `8000`                     | Server port                                 |
+| `WORKERS`                 | `1`                        | Number of worker processes for parallel processing |
 | `LOG_LEVEL`               | `INFO`                     | Logging level (DEBUG, INFO, WARNING, ERROR) |
 | `STORAGE_TYPE`            | `memory`                   | Storage type: `memory` or `redis`           |
 | `REDIS_URL`               | `redis://localhost:6379/0` | Redis connection URL                        |
@@ -538,6 +545,7 @@ docker run -d \
 **Volumes:**
 
 - `model-cache` - Caches downloaded models from HuggingFace (persists between restarts)
+- `model-storage` - Persistent storage for downloaded models (avoids re-downloading on rebuild)
 - `redis-data` - Persistent Redis data storage
 
 **Health Checks:**
@@ -628,6 +636,143 @@ brew services start redis
 
 ---
 
+## ⚙️ Performance Tuning
+
+### Parallel Processing with Multiple Workers
+
+The API supports parallel processing of multiple audio files simultaneously through multiple worker processes. This is especially useful when you need to process many files concurrently.
+
+#### How It Works
+
+- **Automatic ONNX Runtime Configuration**: The API automatically patches ONNX Runtime to support parallel workers without modifying the T-one package. Each worker can process requests independently.
+- **Worker Processes**: Each worker runs in a separate process with its own model instance, allowing true parallel processing.
+- **Load Distribution**: Gunicorn automatically distributes incoming requests across available workers.
+
+#### Configuring Workers
+
+**Docker (Recommended):**
+
+1. **Using .env file (easiest):**
+   ```bash
+   # Create or edit .env file
+   echo "WORKERS=4" >> .env
+   
+   # Start API
+   docker compose up -d api
+   ```
+
+2. **Edit docker-compose.yml:**
+   ```yaml
+   services:
+     api:
+       environment:
+         WORKERS: "4"  # Adjust based on your CPU cores
+   ```
+   Then run: `docker compose up -d api`
+
+3. **Environment variable (docker-compose v2.20+):**
+   ```bash
+   WORKERS=4 docker compose up -d api
+   ```
+
+**Local Installation:**
+
+```bash
+# Production mode with 4 workers
+make run-prod WORKERS=4
+
+# Or directly with gunicorn:
+poetry run gunicorn asr_api.main:app \
+  -w 4 \
+  -k uvicorn.workers.UvicornWorker \
+  --bind 0.0.0.0:8000 \
+  --timeout 300
+```
+
+**Development Mode:**
+```bash
+# Single worker with auto-reload (for development)
+make run
+```
+
+#### Recommendations
+
+| CPU Cores | Recommended Workers | Notes |
+|-----------|---------------------|-------|
+| 2-4       | `WORKERS=2-4`       | Use all cores |
+| 4-8       | `WORKERS=4-7`       | Leave 1 core for system |
+| 8-16      | `WORKERS=8-15`      | Leave 1-2 cores for system |
+| 16+       | `WORKERS=15-31`     | Leave 1-2 cores for system |
+
+**Resource Considerations:**
+- **Memory**: Each worker loads the model (~500MB-1GB RAM per worker)
+- **CPU**: More workers = better throughput, but diminishing returns after ~CPU cores
+- **I/O**: Multiple workers help when processing many files simultaneously
+
+#### Performance Tips
+
+1. **Start with CPU cores count**: Set `WORKERS` equal to your CPU core count
+2. **Monitor resource usage**: Watch CPU and memory usage, adjust if needed
+3. **Use Redis for multi-instance**: When scaling across multiple servers, use Redis storage
+4. **Test with your workload**: Different audio file sizes may benefit from different worker counts
+
+#### Verification
+
+After starting with multiple workers, check logs to verify:
+
+```bash
+# Docker
+docker compose logs api | grep "Booting worker"
+
+# Should show multiple workers:
+# [INFO] Booting worker with pid: 12
+# [INFO] Booting worker with pid: 13
+# [INFO] Booting worker with pid: 14
+# [INFO] Booting worker with pid: 15
+```
+
+You should also see:
+```
+INFO: ONNX Runtime patch applied successfully for parallel workers
+```
+
+This confirms that parallel processing is enabled.
+
+#### Example: Processing Multiple Files
+
+With 4 workers, you can process 4 audio files simultaneously:
+
+```python
+import asyncio
+import aiohttp
+
+async def transcribe_file(session, url, file_path):
+    with open(file_path, 'rb') as f:
+        data = aiohttp.FormData()
+        data.add_field('file', f, filename='audio.wav')
+        async with session.post(url, data=data) as resp:
+            return await resp.json()
+
+async def main():
+    url = "http://localhost:8000/transcribe"
+    files = ["file1.wav", "file2.wav", "file3.wav", "file4.wav"]
+    
+    async with aiohttp.ClientSession() as session:
+        # Process all files in parallel
+        results = await asyncio.gather(*[
+            transcribe_file(session, url, f) for f in files
+        ])
+    
+    for result in results:
+        print(result['full_text'])
+
+asyncio.run(main())
+```
+
+With 4 workers, all 4 files will be processed simultaneously, significantly reducing total processing time.
+
+---
+
 ## 🐛 Troubleshooting
 
 ### Network Timeout Errors
@@ -708,12 +853,20 @@ t-one-rest-api/
 ├── asr_api/                 # Main API package
 │   ├── __init__.py
 │   ├── main.py              # FastAPI application
+│   ├── config.py            # Configuration management
 │   ├── models.py            # Pydantic data models
-│   ├── audio_processor.py  # Audio processing & T-one integration
-│   └── example_client.py    # Usage examples
+│   ├── audio_processor.py   # Audio processing & T-one integration
+│   ├── onnx_patch.py        # ONNX Runtime patch for parallel workers
+│   ├── routers/             # API route handlers
+│   ├── services/            # Business logic services
+│   ├── storage/             # Storage backends (memory/redis)
+│   └── utils/               # Utility functions
 ├── T-one/                   # T-one repository (auto-cloned)
 ├── pyproject.toml           # Poetry configuration
 ├── Makefile                 # Build automation
+├── Dockerfile               # Docker image for memory storage
+├── Dockerfile.redis         # Docker image for Redis storage
+├── docker-compose.yml       # Docker Compose configuration
 └── README.md                # This file
 ```
 

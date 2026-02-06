@@ -1,11 +1,13 @@
-.PHONY: install install-redis run clean help docker-build docker-up docker-down docker-logs
+.PHONY: install install-redis run run-prod clean help docker-build docker-up docker-down docker-logs
 
 # Default target
 help:
 	@echo "Available targets:"
 	@echo "  make install       - Clone T-One repository and install dependencies (memory storage)"
 	@echo "  make install-redis - Install with Redis support for distributed storage"
-	@echo "  make run           - Start the ASR API server"
+	@echo "  make run           - Start the ASR API server (development mode, single worker, auto-reload)"
+	@echo "  make run-prod      - Start the ASR API server (production mode, multiple workers)"
+	@echo "                      Usage: make run-prod WORKERS=4"
 	@echo "  make clean         - Remove T-One clone and cache files"
 	@echo "  make docker-build  - Build Docker images"
 	@echo "  make docker-up     - Start services with docker-compose"
@@ -112,10 +114,28 @@ install-redis:
 	@echo ""
 	@echo "Make sure Redis is running before starting the API server."
 
-# Run the API server
+# Run the API server (development mode with auto-reload)
 run:
-	@echo "Starting ASR API server..."
+	@echo "Starting ASR API server in development mode (single worker, auto-reload)..."
 	poetry run uvicorn asr_api.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Run the API server (production mode with multiple workers)
+# Usage: make run-prod WORKERS=4
+run-prod:
+	@echo "Starting ASR API server in production mode with $(or $(WORKERS),1) worker(s)..."
+	@if [ "$(WORKERS)" = "1" ] || [ -z "$(WORKERS)" ]; then \
+		echo "Using uvicorn (single worker)"; \
+		poetry run uvicorn asr_api.main:app --host 0.0.0.0 --port 8000; \
+	else \
+		echo "Using gunicorn with $(WORKERS) workers"; \
+		poetry run gunicorn asr_api.main:app \
+			-w $(WORKERS) \
+			-k uvicorn.workers.UvicornWorker \
+			--bind 0.0.0.0:8000 \
+			--timeout 300 \
+			--access-logfile - \
+			--error-logfile -; \
+	fi
 
 # Clean up
 clean:
@@ -137,8 +157,9 @@ clean:
 
 # Docker commands
 docker-build:
-	@echo "Building Docker images..."
-	docker compose build
+	@echo "Building Docker images with BuildKit (enables model cache)..."
+	@echo "Note: Model will be cached and won't be re-downloaded on rebuild"
+	DOCKER_BUILDKIT=1 docker compose build
 
 docker-up:
 	@echo "Starting services with docker-compose..."

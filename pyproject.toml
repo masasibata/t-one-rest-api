@@ -11,6 +11,7 @@ packages = [{include = "asr_api"}]
 python = "^3.9"
 fastapi = ">=0.104.0"
 uvicorn = {extras = ["standard"], version = ">=0.24.0"}
+gunicorn = ">=21.2.0"
 python-multipart = ">=0.0.6"
 pydantic = ">=2.0.0"
 pydantic-settings = ">=2.0.0"
@@ -22,7 +23,6 @@ redis = {version = ">=5.0.0", optional = true}
 redis = ["redis"]
 
 [tool.poetry.group.dev.dependencies]
-# Development dependencies can be added here if needed
 
 [build-system]
 requires = ["poetry-core"]

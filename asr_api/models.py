@@ -1,9 +1,11 @@
+from typing import List
+
 from pydantic import BaseModel
-from typing import List, Optional
 
 
 class TextPhrase(BaseModel):
     """Phrase with timestamps"""
+
     text: str
     start_time: float
     end_time: float
@@ -11,6 +13,7 @@ class TextPhrase(BaseModel):
 
 class TranscriptionResponse(BaseModel):
     """Response with recognition results"""
+
     phrases: List[TextPhrase]
     full_text: str
     duration: float
@@ -19,7 +22,7 @@ class TranscriptionResponse(BaseModel):
 
 class StreamingStateResponse(BaseModel):
     """Response for streaming mode"""
+
     phrases: List[TextPhrase]
     state_id: str
     is_final: bool
-

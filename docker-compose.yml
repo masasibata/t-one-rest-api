@@ -10,16 +10,14 @@ services:
       HOST: "0.0.0.0"
       PORT: "8000"
       LOG_LEVEL: "INFO"
+      WORKERS: "${WORKERS:-1}"  # Number of worker processes. Set in .env file or override with environment variable
       STORAGE_TYPE: "memory"
       SESSION_TIMEOUT_SECONDS: "3600"
       MAX_FILE_SIZE_MB: "100"
       PYTHONUNBUFFERED: "1"
-      # API_KEY: "your-secret-key-here"  # Optional: Uncomment to enable API key authentication
     volumes:
-      # Mount code for development (optional)
-      # - ./asr_api:/app/asr_api
-      # Cache model downloads
       - model-cache:/root/.cache/huggingface
+      - model-storage:/models
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -41,17 +39,18 @@ services:
       HOST: "0.0.0.0"
       PORT: "8000"
       LOG_LEVEL: "INFO"
+      WORKERS: "${WORKERS:-1}"  # Number of worker processes. Set in .env file or override with environment variable
       STORAGE_TYPE: "redis"
       REDIS_URL: "redis://redis:6379/0"
       REDIS_KEY_PREFIX: "asr:session:"
       SESSION_TIMEOUT_SECONDS: "3600"
       MAX_FILE_SIZE_MB: "100"
       PYTHONUNBUFFERED: "1"
-      # API_KEY: "your-secret-key-here"  # Optional: Uncomment to enable API key authentication
     depends_on:
       - redis
     volumes:
       - model-cache:/root/.cache/huggingface
+      - model-storage:/models
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -81,6 +80,8 @@ services:
 
 volumes:
   model-cache:
+    driver: local
+  model-storage:
     driver: local
   redis-data:
     driver: local

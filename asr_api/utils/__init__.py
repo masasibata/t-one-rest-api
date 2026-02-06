@@ -1,8 +1,9 @@
 """Utility functions and helpers"""
 
-from .converters import phrases_to_text_phrases, calculate_duration, extract_full_text
-from .validators import validate_audio_file
+from .converters import (calculate_duration, extract_full_text,
+                         phrases_to_text_phrases)
 from .exceptions import ASRException, ModelNotLoadedError, StateNotFoundError
+from .validators import validate_audio_file
 
 __all__ = [
     "phrases_to_text_phrases",
@@ -13,4 +14,3 @@ __all__ = [
     "ModelNotLoadedError",
     "StateNotFoundError",
 ]
-
